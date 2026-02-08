@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Predictive Maintenance - Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Machine Maintenance & RUL Predictor</h1>
+      <p class="subtitle">Fill the fields below → both models will predict simultaneously.</p>
+    </header>
+
+    {% if error %}
+      <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+      <section class="results-card">
+        <h2>Results</h2>
+        <div class="result-row">
+          <strong>Maintenance prediction:</strong>
+          <span class="pill">{{ result.maintenance_label }}</span>
+          {% if result.maintenance_prob is not none %}
+            <small> (probability: {{ result.maintenance_prob }} )</small>
+          {% endif %}
+        </div>
+        <div class="result-row">
+          <strong>Predicted Remaining Useful Life (RUL):</strong>
+          <span class="pill">{{ result.rul }}</span>
+        </div>
+        <a class="btn" href="{{ url_for('index') }}">Predict new</a>
+      </section>
+    {% else %}
+      <form id="predictForm" action="{{ url_for('predict') }}" method="post" novalidate>
+        <div class="grid">
+          <div class="card">
+            <h3>Identifiers</h3>
+            <label>Product ID (text) <small>(optional - keep original id if available)</small>
+              <input name="product_id" id="product_id" placeholder="e.g. M14860">
+            </label>
+            <label>UDI (optional)
+              <input name="udi" id="udi" type="number" step="1" min="0" placeholder="e.g. 100">
+            </label>
+            <label>Type
+              <select name="type" id="type" required>
+                <option value="L" selected>L</option>
+                <option value="M">M</option>
+                <option value="H">H</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="card">
+            <h3>Temperatures & speed</h3>
+            <label>Air temperature [K]
+              <input name="air_temp" id="air_temp" type="number" step="0.1" required placeholder="e.g. 300.7">
+            </label>
+            <label>Process temperature [K]
+              <input name="process_temp" id="process_temp" type="number" step="0.1" required placeholder="e.g. 310.6">
+            </label>
+            <label>Rotational speed [rpm]
+              <input name="rot_speed" id="rot_speed" type="number" step="1" required placeholder="e.g. 1452">
+            </label>
+            <label>Torque [Nm]
+              <input name="torque" id="torque" type="number" step="0.1" required placeholder="e.g. 40.2">
+            </label>
+            <label>Tool wear [min]
+              <input name="tool_wear" id="tool_wear" type="number" step="1" required placeholder="e.g. 0">
+            </label>
+          </div>
+
+          <div class="card">
+            <h3>Failure flags (binary)</h3>
+            <div class="checkbox-grid">
+              <label class="chk"><input type="checkbox" name="machine_failure" id="machine_failure"> Machine failure</label>
+              <label class="chk"><input type="checkbox" name="TWF" id="TWF"> TWF</label>
+              <label class="chk"><input type="checkbox" name="HDF" id="HDF"> HDF</label>
+              <label class="chk"><input type="checkbox" name="PWF" id="PWF"> PWF</label>
+              <label class="chk"><input type="checkbox" name="OSF" id="OSF"> OSF</label>
+              <label class="chk"><input type="checkbox" name="RNF" id="RNF"> RNF</label>
+            </div>
+
+            <small class="hint">Click the boxes for flags = 1 (true). Unchecked = 0.</small>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn" type="submit">Predict</button>
+          <button class="btn ghost" type="button" id="fillSample">Fill sample values</button>
+        </div>
+      </form>
+    {% endif %}
+
+    <footer>
+      <small>Tip: If your pickled models include preprocessing pipelines (scalers/encoders), results will match training. If not, you may need to wrap preprocessing into / re-pickle a pipeline.</small>
+    </footer>
+  </main>
+
+<script>
+/* Inline JS: validation helpers & sample fill */
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('predictForm');
+  const fillBtn = document.getElementById('fillSample');
+
+  if (fillBtn) {
+    fillBtn.addEventListener('click', () => {
+      document.getElementById('product_id').value = 'M14860';
+      document.getElementById('udi').value = 1;
+      document.getElementById('type').value = 'L';
+      document.getElementById('air_temp').value = 300.7;
+      document.getElementById('process_temp').value = 310.6;
+      document.getElementById('rot_speed').value = 1452;
+      document.getElementById('torque').value = 40.2;
+      document.getElementById('tool_wear').value = 0;
+      document.getElementById('machine_failure').checked = false;
+      document.getElementById('TWF').checked = false;
+      document.getElementById('HDF').checked = false;
+      document.getElementById('PWF').checked = false;
+      document.getElementById('OSF').checked = false;
+      document.getElementById('RNF').checked = false;
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      // basic client-side validation
+      const requiredFields = ['air_temp','process_temp','rot_speed','torque','tool_wear'];
+      let valid = true;
+      requiredFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el.value || el.value.trim() === '') {
+          el.classList.add('input-error');
+          valid = false;
+        } else {
+          el.classList.remove('input-error');
+        }
+      });
+      if (!valid) {
+        e.preventDefault();
+        alert('Please fill required numeric fields (temperatures, speed, torque, tool wear).');
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Predictive Maintenance</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h1>Predictive Maintenance Model</h1>
+    <form action="/predict" method="POST">
+      <label for="feature1">Feature 1:</label>
+      <input type="number" step="any" name="feature1" required />
+
+      <label for="feature2">Feature 2:</label>
+      <input type="number" step="any" name="feature2" required />
+
+      <label for="feature3">Feature 3:</label>
+      <input type="number" step="any" name="feature3" required />
+
+      <label for="feature4">Feature 4:</label>
+      <input type="number" step="any" name="feature4" required />
+
+      <button type="submit">Predict</button>
+    </form>
+
+    {% if prediction_text %}
+      <div class="result">
+        <h2>{{ prediction_text }}</h2>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

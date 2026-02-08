@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Predictive Maintenance</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+
+    {% if error %}
+      <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+      <div class="result">
+        <p>Maintenance Prediction: <strong>{{ result.maintenance_label }}</strong>
+        {% if result.maintenance_prob is not none %}
+          (Probability: {{ result.maintenance_prob }})
+        {% endif %}</p>
+        <p>Predicted RUL: <strong>{{ result.rul }}</strong></p>
+      </div>
+      <button onclick="window.location='/'">Predict New</button>
+    {% else %}
+      <form action="{{ url_for('predict') }}" method="post">
+        <input name="product_id" placeholder="Product ID (optional)">
+        <select name="type">
+          <option value="L" selected>L</option>
+          <option value="M">M</option>
+          <option value="H">H</option>
+        </select>
+        <input name="air_temp" type="number" step="0.1" placeholder="Air Temp [K]" required>
+        <input name="process_temp" type="number" step="0.1" placeholder="Process Temp [K]" required>
+        <input name="rot_speed" type="number" step="1" placeholder="Rotational Speed" required>
+        <input name="torque" type="number" step="0.1" placeholder="Torque" required>
+        <input name="tool_wear" type="number" step="1" placeholder="Tool Wear" required>
+
+        <label><input type="checkbox" name="machine_failure"> Machine Failure</label>
+        <label><input type="checkbox" name="TWF"> TWF</label>
+        <label><input type="checkbox" name="HDF"> HDF</label>
+        <label><input type="checkbox" name="PWF"> PWF</label>
+        <label><input type="checkbox" name="OSF"> OSF</label>
+        <label><input type="checkbox" name="RNF"> RNF</label>
+
+        <button type="submit">Predict</button>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>
